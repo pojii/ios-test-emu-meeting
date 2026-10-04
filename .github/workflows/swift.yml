@@ -1,0 +1,60 @@
+name: Swift iOS Build & Gen IPA
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch: # มีปุ่มให้กดสั่งรันเองผ่านหน้าเว็บเบราว์เซอร์ได้ตลอดเวลา
+
+jobs:
+  build:
+    name: Build MeetUp IPA
+    # ใช้ macOS 15 เพราะ XcodeGen เวอร์ชันล่าสุดสร้างโปรเจกต์ format 77 ซึ่งต้องเปิดด้วย Xcode 16 ขึ้นไป
+    # (Xcode 15.4 บน macos-14 เปิดไม่ได้ → error "future Xcode project file format (77)")
+    runs-on: macos-15
+
+    steps:
+      # 1. ดึงโค้ดโปรเจกต์จาก GitHub
+      - name: 1. Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. ใช้ Xcode ค่าเริ่มต้นของ runner (Xcode 16.x) แล้วแสดงเวอร์ชันไว้ตรวจสอบ
+      - name: 2. Show Xcode Version
+        run: xcodebuild -version
+
+      # 3. ติดตั้ง XcodeGen เพื่อสร้าง MeetUp.xcodeproj อัตโนมัติจาก project.yml
+      - name: 3. Install XcodeGen
+        run: brew install xcodegen
+
+      # 4. สั่งสร้างไฟล์โปรเจกต์ Xcode
+      - name: 4. Generate Xcode Project
+        run: xcodegen generate
+
+      # 5. คอมไพล์โค้ด SwiftUI เป็น iOS Binary (ไม่ต้องใช้ใบรับรอง Apple Developer)
+      - name: 5. Build iOS App
+        run: |
+          xcodebuild build \
+            -project MeetUp.xcodeproj \
+            -scheme MeetUp \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      # 6. รวมไฟล์ .app ให้อยู่ในโฟลเดอร์ Payload แล้ว Zip เป็น .ipa
+      - name: 6. Package into .ipa
+        run: |
+          mkdir Payload
+          cp -r build/Build/Products/Release-iphoneos/MeetUp.app Payload/
+          zip -r MeetUp.ipa Payload
+          echo "Gen ไฟล์ MeetUp.ipa เรียบร้อยแล้ว!"
+
+      # 7. นำไฟล์ .ipa ออกมาแสดงเป็นปุ่มดาวน์โหลดในหน้าเว็บเบราว์เซอร์
+      - name: 7. Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeetUp-IPA-Download
+          path: MeetUp.ipa
+          retention-days: 7
