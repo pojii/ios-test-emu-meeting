@@ -1,0 +1,67 @@
+name: Build iOS and Upload to BrowserStack
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # อนุญาตให้กดสั่งรันเองได้จากแถบ Actions บน GitHub
+
+jobs:
+  build-and-upload:
+    name: Build IPA & Upload to BrowserStack
+    runs-on: macos-14 # macOS Sonoma (M1/M2 runner ฟรีสำหรับ Public Repo)
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Set Up Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+
+      - name: 3. Install XcodeGen
+        run: brew install xcodegen
+
+      - name: 4. Generate Xcode Project
+        run: xcodegen generate
+
+      - name: 5. Build iOS App (Device Build)
+        run: |
+          xcodebuild build \
+            -project MeetUp.xcodeproj \
+            -scheme MeetUp \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: 6. Package into .ipa
+        run: |
+          mkdir Payload
+          cp -r build/Build/Products/Release-iphoneos/MeetUp.app Payload/
+          zip -r MeetUp.ipa Payload
+          echo "MeetUp.ipa created successfully!"
+
+      - name: 7. Save IPA as GitHub Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeetUp-iOS-App
+          path: MeetUp.ipa
+
+      - name: 8. Upload to BrowserStack App Live
+        if: env.BS_USER != '' && env.BS_KEY != ''
+        env:
+          BS_USER: ${{ secrets.BROWSERSTACK_USERNAME }}
+          BS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+        run: |
+          echo "Uploading to BrowserStack App Live..."
+          RESPONSE=$(curl -u "$BS_USER:$BS_KEY" \
+            -X POST "https://api-cloud.browserstack.com/app-live/upload" \
+            -F "file=@MeetUp.ipa")
+          
+          echo "Response: $RESPONSE"
+          
+          # แยกค่า app_url ออกมาแสดงใน GitHub Action Summary
+          APP_URL=$(echo $RESPONSE | grep -o '"app_url":"[^"]*' | grep -o '[^"]*$')
+          echo "### 🚀 BrowserStack Upload Success!" >> $GITHUB_STEP_SUMMARY
+          echo "- **App URL**: \`$APP_URL\`" >> $GITHUB_STEP_SUMMARY
+          echo "- คุณสามารถเปิด [BrowserStack App Live](https://app-live.browserstack.com/) เพื่อเลือก iPhone ทดสอบได้ทันที" >> $GITHUB_STEP_SUMMARY
