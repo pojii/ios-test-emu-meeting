@@ -32,7 +32,7 @@ final class JoinMeetingViewModel {
         let digits = meetingCode.filter(\.isNumber)
         guard digits.count >= 9 else {
             errorMessage = "กรุณากรอกรหัสการประชุม 9-11 หลัก"
-            return false ? nil : nil
+            return nil
         }
 
         isLoading = true

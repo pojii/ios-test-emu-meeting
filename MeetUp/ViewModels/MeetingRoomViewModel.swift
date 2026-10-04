@@ -55,10 +55,6 @@ final class MeetingRoomViewModel {
         startSession()
     }
 
-    deinit {
-        timerTask?.cancel()
-    }
-
     // MARK: - Formatted Timer
 
     /// แสดงเวลาการประชุมในรูปแบบ "MM:SS" หรือ "HH:MM:SS"

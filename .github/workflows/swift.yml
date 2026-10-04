@@ -34,6 +34,7 @@ jobs:
       # 5. คอมไพล์โค้ด SwiftUI เป็น iOS Binary (ไม่ต้องใช้ใบรับรอง Apple Developer)
       - name: 5. Build iOS App
         run: |
+          set -o pipefail
           xcodebuild build \
             -project MeetUp.xcodeproj \
             -scheme MeetUp \
@@ -41,7 +42,8 @@ jobs:
             -destination "generic/platform=iOS" \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            | xcbeautify --renderer github-actions
 
       # 6. รวมไฟล์ .app ให้อยู่ในโฟลเดอร์ Payload แล้ว Zip เป็น .ipa
       - name: 6. Package into .ipa
